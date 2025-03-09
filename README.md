@@ -14,7 +14,7 @@ An agent-based simulation of the interactions between predator and prey populat
 Nathan Onyechie
 
 ## Architecture
-The application follows a modular architecture with clear separation of Logic and UI as stated by the rubric:
+The application follows a modular architecture with separation of each module
 
 ![Architecture Diagram](docs/images/architecture.png)
 
