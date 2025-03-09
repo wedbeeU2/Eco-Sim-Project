@@ -77,19 +77,19 @@ class PredatorAttributes(EntityAttributes):
         """Initialize predator-specific attributes"""
         # Predator-specific parameters
         super().__init__(
-            max_energy=1000,
+            max_energy=800,
             energy_consumption=0.5,
             speed=2.0,
-            interaction_range=50.0,
-            maturity_age=730  # 2 years in days
+            interaction_range=60.0,
+            maturity_age=450  # 2 years in days
         )
         
-        self._hunting_range = validate_positive(75.0, "hunting_range")
-        self._attack_strength = validate_positive(25.0, "attack_strength")
-        self._breeding_cycle = validate_positive(180, "breeding_cycle")  # 6 months in days
-        self._min_offspring = validate_positive(4, "min_offspring")
-        self._max_offspring = validate_positive(7, "max_offspring")
-        self._digest_efficiency = validate_range(0.7, "digest_efficiency", 0, 1)  # 70% of prey energy is converted
+        self._hunting_range = validate_positive(100.0, "hunting_range")
+        self._attack_strength = validate_positive(35.0, "attack_strength")
+        self._breeding_cycle = validate_positive(130, "breeding_cycle")  # 6 months in days
+        self._min_offspring = validate_positive(1, "min_offspring")
+        self._max_offspring = validate_positive(2, "max_offspring")
+        self._digest_efficiency = validate_range(0.8, "digest_efficiency", 0, 1)  # 80% of prey energy is converted
     
     @property
     def hunting_range(self):
@@ -129,19 +129,19 @@ class PreyAttributes(EntityAttributes):
         """Initialize prey-specific attributes"""
         # Prey-specific parameters
         super().__init__(
-            max_energy=500,
-            energy_consumption=0.3,
+            max_energy=450,
+            energy_consumption=0.35,
             speed=2.5,  # Slightly faster than predators
             interaction_range=30.0,
-            maturity_age=180  # 6 months in days
+            maturity_age=200  # 6 months in days
         )
         
-        self._flee_range = validate_positive(100.0, "flee_range")
-        self._foraging_efficiency = validate_positive(15.0, "foraging_efficiency")
-        self._breeding_cycle = validate_positive(30, "breeding_cycle")  # 30 days
+        self._flee_range = validate_positive(120.0, "flee_range")
+        self._foraging_efficiency = validate_positive(12.0, "foraging_efficiency")
+        self._breeding_cycle = validate_positive(65, "breeding_cycle")
         self._min_offspring = validate_positive(4, "min_offspring")
-        self._max_offspring = validate_positive(12, "max_offspring")
-        self._perception_range = validate_positive(80.0, "perception_range")  # Range to detect predators
+        self._max_offspring = validate_positive(6, "max_offspring")
+        self._perception_range = validate_positive(100.0, "perception_range")  # Range to detect predators
     
     @property
     def flee_range(self):
@@ -191,8 +191,8 @@ class InvasiveSpeciesAttributes(EntityAttributes):
         self._competition_factor = validate_positive(2.0, "competition_factor")  # How strongly it competes
         self._adaptation_rate = validate_range(0.1, "adaptation_rate", 0, 1)  # How quickly it adapts
         self._breeding_cycle = validate_positive(25, "breeding_cycle")  # 25 days - faster breeding
-        self._min_offspring = validate_positive(6, "min_offspring")
-        self._max_offspring = validate_positive(15, "max_offspring")  # More offspring
+        self._min_offspring = validate_positive(4, "min_offspring")
+        self._max_offspring = validate_positive(6, "max_offspring")  # More offspring
         self._resource_consumption = validate_positive(1.5, "resource_consumption")  # Consumes more resources
     
     @property

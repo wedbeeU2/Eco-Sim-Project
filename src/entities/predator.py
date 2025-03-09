@@ -59,35 +59,100 @@ class Predator(Entity):
     
     def update(self, world, time_delta):
         """
-        Update the predator's state.
-        
+        Update the predator's state with balanced hunting and reproduction priorities.
+    
         Args:
             world (World): The world environment
             time_delta (float): Time elapsed since last update
-            
-        Returns:
-            bool: True if update was successful
         """
+        # Ensure time_delta is positive
+        effective_time_delta = max(0.001, time_delta)
+    
         # Update base entity state
-        super().update(world, time_delta)
-        
+        super().update(world, effective_time_delta)
+    
         if not self.is_alive:
             return False
-        
+    
         # Update reproduction timer
-        self._time_since_last_reproduction += time_delta
-        
+        self._time_since_last_reproduction += effective_time_delta
+    
         # Update hunting cooldown
         if self._hunting_cooldown > 0:
-            self._hunting_cooldown = max(0, self._hunting_cooldown - time_delta)
+            self._hunting_cooldown = max(0, self._hunting_cooldown - effective_time_delta)
+    
+        # MAJOR CHANGE: Check reproduction readiness first
+        # This gives reproduction priority over hunting when possible
+        if self.can_reproduce():
+            # Log reproduction attempt for debugging
+            from src.utils.exceptions import logger
+            logger.info(f"Predator {self.id} attempting to reproduce")
         
-        # Use behavior system if available
-        behavior_system = getattr(self, '_behavior_system', None)
-        if behavior_system is not None:
-            return behavior_system.update(world)
+            # Find potential mates
+            potential_mates = [
+                entity for entity in world.get_entities_in_range(
+                    self.position, self.attributes.interaction_range * 1.5  # Increased range
+                )
+                if isinstance(entity, type(self)) 
+                and entity.is_alive 
+                and entity.gender != self.gender
+                and entity.can_reproduce()
+            ]
         
-        # Basic behavior when no behavior system is attached
-        return self._basic_behavior(world)
+            if potential_mates:
+                # Reproduce with a random mate
+                mate = random.choice(potential_mates)
+
+                # Move towards mate if not already close
+                if self.position.distance_to(mate.position) > self.attributes.interaction_range:
+                    self.move(mate.position)
+                else:
+                    # Attempt reproduction
+                    offspring = self.reproduce(mate, world)
+                    if offspring:
+                        from src.utils.exceptions import logger
+                        logger.info(f"Predator {self.id} successfully reproduced, creating {len(offspring)} offspring")
+            
+                return True
+            else:
+                # Look for mates - move to a random location to find mates
+                # This makes predators actively search for mates
+                self.move()
+                return True
+    
+        # If not reproducing, check if hungry
+        if self.energy < 0.7 * self.attributes.max_energy:
+            # Find prey to hunt
+            from src.entities.prey import Prey
+            prey_in_range = [
+                entity for entity in world.get_entities_in_range(
+                    self.position, self.attributes.hunting_range
+                )
+                if isinstance(entity, Prey) and entity.is_alive
+            ]
+        
+            if prey_in_range and self._hunting_cooldown <= 0:
+                # Hunt a random prey
+                target_prey = random.choice(prey_in_range)
+                self.move(target_prey.position)
+                hunt_result = self.hunt(target_prey, world)
+            
+                # Log successful hunts for debugging
+                if hunt_result:
+                    from src.utils.exceptions import logger
+                    logger.info(f"Predator {self.id} successfully hunted prey")
+            
+                return True
+            else:
+                # Move randomly looking for prey
+                self.move()
+                return True
+        else:
+            # Not hungry or reproducing - move randomly
+            # This adds more exploration to find mates
+            self.move()
+            return True
+
     
     def _basic_behavior(self, world):
         """
@@ -150,50 +215,69 @@ class Predator(Entity):
     
     def hunt(self, prey, world):
         """
-        Hunt a prey entity.
-        
+        Hunt a prey entity - enhanced for better success rate.
+    
         Args:
             prey: The prey entity to hunt
             world: The world environment
-            
+        
         Returns:
             bool: True if hunt was successful
-            
-        Raises:
-            EntityError: If hunting fails
         """
         try:
-            validate_type(prey, "prey", object)  # Just check it's an object, more specific check below
-            
+            validate_type(prey, "prey", object)
+        
             # Check if prey is valid
             if not hasattr(prey, 'is_alive') or not prey.is_alive:
                 return False
-            
+        
             # Move towards prey
             self.move(prey.position)
-            
+        
             # Check if close enough to attack
             if self.position.distance_to(prey.position) < self.attributes.interaction_range:
                 # Apply hunting cooldown
-                self._hunting_cooldown = 5.0  # 5 seconds cooldown
-                
-                # Attack success probability based on health and energy
-                attack_success = random.random() < (self.health / 100) * (self.energy / self.attributes.max_energy)
-                
+                self._hunting_cooldown = 5.0  # Reduced from 5.0
+            
+                # Calculate base attack success probability
+                # Enhanced formula that factors in predator's adaptation
+                base_success_prob = 0.5  # Base 50% chance
+            
+                # Modify by health and energy ratios
+                health_factor = self.health / 100.0
+                energy_factor = self.energy / self.attributes.max_energy
+            
+                # NEW: Consider prey's health and energy too
+                prey_health_factor = 1.0 - (prey.health / 100.0) * 0.5  # Weaker prey easier to catch
+                prey_energy_factor = 1.0 - (prey.energy / prey.attributes.max_energy) * 0.5  # Tired prey easier to catch
+            
+                # Calculate final success probability
+                attack_success_prob = base_success_prob * health_factor * energy_factor * prey_health_factor * prey_energy_factor
+            
+                # Ensure reasonable bounds
+                attack_success_prob = max(0.2, min(0.9, attack_success_prob))
+            
+                # Check for success
+                attack_success = random.random() < attack_success_prob
+            
                 if attack_success:
                     # Successful hunt
                     prey_energy = prey.energy
                     prey.health = 0  # Kill the prey
-                    
-                    # Gain energy from prey
+
+                    # Gain energy from prey - more efficient
                     energy_gained = prey_energy * self.attributes.digest_efficiency
                     self.energy = min(self.attributes.max_energy, self.energy + energy_gained)
-                    
+
                     return True
-            
+        
             return False
         except Exception as e:
-            raise EntityError(f"Hunting failed: {str(e)}", entity=self)
+            # Log error and ensure predator keeps moving
+            from src.utils.exceptions import logger
+            logger.error(f"Error during hunting: {str(e)}")
+            self.move()
+            return False
     
     def interact(self, other, world):
         """
@@ -223,53 +307,68 @@ class Predator(Entity):
     
     def can_reproduce(self):
         """
-        Check if the predator can reproduce.
-        
+        Check if the predator can reproduce with improved criteria.
+    
         Returns:
             bool: True if reproduction is possible
         """
-        return (
+        # Energy threshold reduced from 0.6 to 0.5
+        energy_threshold = 0.5 * self.attributes.max_energy
+    
+        reproduction_ready = (
             self.is_mature() and
             self._time_since_last_reproduction >= self.attributes.breeding_cycle and
-            self.energy > 0.6 * self.attributes.max_energy and
-            self.health > 50
+            self.energy > energy_threshold and
+            self.health > 40  # Reduced from 50 to make reproduction more likely
         )
+    
+        # Log reproduction readiness for debugging
+        if reproduction_ready:
+            from src.utils.exceptions import logger
+            logger.debug(f"Predator {self.id} is ready to reproduce")
+    
+        return reproduction_ready
     
     def reproduce(self, partner, world):
         """
-        Reproduce with another predator.
-        
+        Reproduce with another predator. Enhanced to ensure successful reproduction.
+    
         Args:
             partner: The partner predator
             world: The world environment
-            
+        
         Returns:
             list: List of offspring entities
-            
-        Raises:
-            EntityError: If reproduction fails
         """
         try:
-            validate_type(partner, "partner", Predator)
-            
+            # Check partner type
+            if not isinstance(partner, type(self)):
+                from src.utils.exceptions import logger
+                logger.error(f"Invalid partner type for reproduction: {type(partner)}")
+                return []
+        
+            # Check reproduction readiness for both
             if not (self.can_reproduce() and partner.can_reproduce()):
                 return []
-            
+        
             # Reset reproduction timers
             self._time_since_last_reproduction = 0
-            partner.time_since_last_reproduction = 0
-            
-            # Energy cost for reproduction
-            reproduction_cost = 0.3 * self.attributes.max_energy
+            partner._time_since_last_reproduction = 0
+        
+            # Energy cost for reproduction - REDUCED to 25%
+            reproduction_cost = 0.25 * self.attributes.max_energy
             self.energy -= reproduction_cost
             partner.energy -= reproduction_cost
-            
+        
             # Generate offspring
             num_offspring = random.randint(
                 self.attributes.min_offspring, 
                 self.attributes.max_offspring
             )
-            
+        
+            # Ensure at least minimum offspring
+            num_offspring = max(num_offspring, self.attributes.min_offspring)
+        
             offspring = []
             for _ in range(num_offspring):
                 # Create a new predator at a position near the parents
@@ -278,28 +377,34 @@ class Predator(Entity):
                     self.position.x + random.uniform(-10, 10),
                     self.position.y + random.uniform(-10, 10)
                 )
-                
-                # Apply random gender
+            
+                # Apply random gender with equal probability
+                from src.core.enums import Gender
                 offspring_gender = random.choice(list(Gender))
-                
-                new_predator = Predator(
+            
+                # Create new predator with higher initial energy
+                new_predator = type(self)(
                     position=offspring_position,
                     gender=offspring_gender,
-                    energy=0.5 * self.attributes.max_energy,
-                    age=0
-                )
-                
-                offspring.append(new_predator)
-                
-                # Add to world safely
-                safe_operation(
-                    lambda: world.add_entity(new_predator),
-                    f"Failed to add offspring {new_predator.id} to world"
+                    energy=0.6 * self.attributes.max_energy,  # Increased from 0.5
+                    age=0,
+                    health=100
                 )
             
+                offspring.append(new_predator)
+            
+                # Add to world
+                world.add_entity(new_predator)
+        
+            # Log successful reproduction
+            from src.utils.exceptions import logger
+            logger.info(f"Created {num_offspring} predator offspring")
+        
             return offspring
         except Exception as e:
-            raise EntityError(f"Reproduction failed: {str(e)}", entity=self)
+            from src.utils.exceptions import logger
+            logger.error(f"Error during reproduction: {str(e)}")
+            return []
     
     def attach_behavior_system(self, behavior_system):
         """

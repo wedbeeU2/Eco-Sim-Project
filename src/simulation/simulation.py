@@ -257,7 +257,7 @@ class Simulation:
         
         return True
     
-    def initialize(self, predator_count=10, prey_count=100, invasive_count=0):
+    def initialize(self, predator_count=25, prey_count=75, invasive_count=0):
         """
         Initialize the simulation with entities.
         
@@ -351,9 +351,9 @@ class Simulation:
             current_time = time.time()
             
             if self._last_update_time == 0:
-                real_time_delta = 0
+                real_time_delta = 0.001  # Small non-zero value for first update
             else:
-                real_time_delta = current_time - self._last_update_time
+                real_time_delta = max(0.001, current_time - self._last_update_time)  # Ensure non-zero
             
             # Tick the clock
             simulation_time_delta = self._clock.tick(real_time_delta)
@@ -439,12 +439,79 @@ class Simulation:
     def reset(self):
         """
         Reset the simulation.
-        
+    
         Returns:
             bool: True if reset was successful
         """
-        self._running = False
-        return self.initialize()
+        try:
+            # Stop the simulation before resetting
+            was_running = self._running
+            self._running = False
+        
+            # Clear the world
+            self._world.clear()
+        
+            # Reset clock and data collection
+            self._clock.reset()
+            self._data_collector.clear_data()
+        
+            # Reset internal state
+            self._last_update_time = 0
+            self._last_data_collection = 0
+            self._current_season = SeasonType.SPRING
+            self._world.current_season = SeasonType.SPRING
+        
+            # Create entities same as initialize
+            from src.entities.predator import Predator
+            from src.entities.prey import Prey
+            from src.core.position import Position
+            from src.core.enums import Gender
+        
+            # Get values from last initialization
+            predator_count = sum(1 for entity in self._world.entities if isinstance(entity, Predator))
+            prey_count = sum(1 for entity in self._world.entities if isinstance(entity, Prey))
+        
+            # Use default values if empty
+            if predator_count == 0:
+                predator_count = 10
+            if prey_count == 0:
+                prey_count = 100
+            
+            # Create predators
+            for _ in range(predator_count):
+                position = Position(
+                    random.uniform(0, self._world.width),
+                    random.uniform(0, self._world.height)
+                )
+                gender = random.choice(list(Gender))
+                predator = Predator(position, gender)
+                self._world.add_entity(predator)
+        
+            # Create prey
+            for _ in range(prey_count):
+                position = Position(
+                    random.uniform(0, self._world.width),
+                    random.uniform(0, self._world.height)
+                )
+                gender = random.choice(list(Gender))
+                prey = Prey(position, gender)
+                self._world.add_entity(prey)
+        
+            # Start the clock
+            self._clock.start()
+        
+            # Collect initial data
+            self._collect_data()
+        
+            # Restore running state if it was running
+            if was_running:
+                self._running = True
+        
+            return True
+        except Exception as e:
+            from src.utils.exceptions import logger
+            logger.error(f"Error resetting simulation: {str(e)}")
+            return False
     
     def is_running(self):
         """

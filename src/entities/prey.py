@@ -180,7 +180,7 @@ class Prey(Entity):
             self.move(flee_position)
             
             # Energy cost for fleeing (higher than normal movement)
-            energy_cost = 0.2 * self.attributes.energy_consumption
+            energy_cost = 0.4 * self.attributes.energy_consumption
             self.energy -= energy_cost
             
             return True

@@ -727,6 +727,10 @@ class Renderer:
             
             # Calculate tooltip dimensions
             line_height = 20
+            max_line_length = 0
+            for tooltip_line in tooltip_lines:
+                max_line_length = max(max_line_length, len(tooltip_line))
+
             tooltip_width = max(len(line) * 7, 150)
             tooltip_height = len(tooltip_lines) * line_height + 10
             
@@ -761,6 +765,7 @@ class Renderer:
             
             # Draw tooltip text
             for i, line in enumerate(tooltip_lines):
+                current_line = tooltip_lines[i]
                 text = self._font.render(line, True, self._colors["ui_text"])
                 self._screen.blit(text, (tooltip_x + 10, tooltip_y + 5 + i * line_height))
             
@@ -997,6 +1002,9 @@ class Renderer:
             bool: True if rendering was successful
         """
         try:
+            # Ensure text is a string
+            tooltip_str = str(text)
+            
             # Create tooltip surface
             tooltip_text = self._font.render(text, True, self._colors["ui_text"])
             tooltip_width = tooltip_text.get_width() + 20

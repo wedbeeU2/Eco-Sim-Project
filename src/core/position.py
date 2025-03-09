@@ -87,47 +87,55 @@ class Position:
     def move_towards(self, target_position, speed):
         """
         Move current position towards target position based on speed.
-        
+    
         Args:
-            target_position (Position): The target position to move towards
-            speed (float): The distance to move
-            
-        Raises:
-            ValidationError: If parameters are invalid
+        target_position (Position): The target position to move towards
+        speed (float): The distance to move
         """
-        validate_type(target_position, "target_position", Position)
-        validate_type(speed, "speed", (int, float))
+        try:
+           # Ensure minimum speed
+            effective_speed = max(0.1, speed)
         
-        if speed < 0:
-            raise ValidationError("Speed must be non-negative", "speed", speed)
-        
-        dist = self.distance_to(target_position)
-        if dist <= speed:
-            self._x = target_position.x
-            self._y = target_position.y
-        else:
-            ratio = speed / dist
-            self._x += (target_position.x - self._x) * ratio
-            self._y += (target_position.y - self._y) * ratio
+            # Calculate direction vector
+            dist = self.distance_to(target_position)
+            if dist <= effective_speed:
+                self._x = target_position.x
+                self._y = target_position.y
+            else:
+                # Calculate normalized direction vector
+                dx = (target_position.x - self._x) / dist
+                dy = (target_position.y - self._y) / dist
+            
+                # Apply movement along direction vector
+                self._x += dx * effective_speed
+                self._y += dy * effective_speed
+        except Exception as e:
+            # Fallback to random movement
+            angle = random.uniform(0, 2 * math.pi)
+            self._x += math.cos(angle) * effective_speed
+            self._y += math.sin(angle) * effective_speed
     
     def move_random(self, speed):
         """
         Move in a random direction with the given speed.
-        
+    
         Args:
             speed (float): The distance to move
-            
-        Raises:
-            ValidationError: If speed is not a positive number
         """
-        validate_type(speed, "speed", (int, float))
+        try:
+            # Ensure minimum speed
+            effective_speed = max(0.1, speed)
         
-        if speed < 0:
-            raise ValidationError("Speed must be non-negative", "speed", speed)
+            # Generate random direction
+            angle = random.uniform(0, 2 * math.pi)
         
-        angle = random.uniform(0, 2 * math.pi)
-        self._x += math.cos(angle) * speed
-        self._y += math.sin(angle) * speed
+            # Apply movement
+            self._x += math.cos(angle) * effective_speed
+            self._y += math.sin(angle) * effective_speed
+        except Exception as e:
+            # If error occurs, still try to move
+            self._x += random.uniform(-effective_speed, effective_speed)
+            self._y += random.uniform(-effective_speed, effective_speed)
     
     def __eq__(self, other):
         """

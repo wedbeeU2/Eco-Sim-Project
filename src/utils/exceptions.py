@@ -126,7 +126,7 @@ def handle_error(error, should_raise=True):
         return False
 
 
-def validate_positive(value, name):
+def validate_positive(value, name, min_value=0.0001):
     """
     Validate that a value is positive
     
@@ -140,9 +140,9 @@ def validate_positive(value, name):
     Raises:
         ValidationError: If validation fails
     """
-    if value <= 0:
+    if value < min_value:
         raise ValidationError(
-            f"Parameter must be positive", 
+            f"Parameter must be positive (at least {min_value})", 
             parameter=name, 
             value=value
         )
