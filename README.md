@@ -188,10 +188,10 @@ This current implementation includes:
 
 Planned enhancements for the next milestone:
 
-1. **Physical Food Resources**: Added a resource-based foraging system rather than abstract energy gain
-2. **Enhanced Competition**: Implemented direct competition between species for limited resources
-3. **Adaptive Population Control**: Added emergency population control for extreme scenarios
-4. **Seasonal Effects**: Implemented seasonal variations in food availability and reproduction
+1. **Physical Food Resources**: Add a resource-based foraging system rather than abstract energy gain
+2. **Enhanced Competition**: Implement direct competition between species for limited resources
+3. **Adaptive Population Control**: Add emergency population control for extreme scenarios
+4. **Seasonal Effects**: Implement seasonal variations in food availability and reproduction
 5. **Genetic Variation**: Simple genetic traits that can evolve over generations
 6. **Territorial Behaviors**: More sophisticated spatial claiming and defense
 
