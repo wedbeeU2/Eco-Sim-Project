@@ -149,26 +149,35 @@ T: Toggle entity tracking
 Esc: Exit simulation
 
 Mouse Controls
-
-Click on entity: Select entity to view detailed information
-Click on UI buttons: Activate corresponding functions
-Drag sliders: Adjust simulation parameters
+   - Click on entity: Select entity to view detailed information
+   - Click on UI buttons: Activate corresponding functions
+   - Drag sliders: Adjust simulation parameters
 
 Visual Guide
 Entity Representation
-
-Red Diamonds: Predators
-Green Diamonds: Prey
-Purple Diamonds: Invasive species
-Green Dots: Food resources
+   - Red Diamonds: Predators
+   - Green Diamonds: Prey
+   - Purple Diamonds: Invasive species
+   - Green Dots: Food resources
 
 UI Elements
+   - Population Statistics: Current counts of each species
+   - Simulation Controls: Start/pause, reset, add invasive species, etc.
+   - Time Information: Current simulation day and time
+   - Seasonal Indicator: Current season affecting resource availability
 
-Population Statistics: Current counts of each species
-Simulation Controls: Start/pause, reset, add invasive species, etc.
-Time Information: Current simulation day and time
-Seasonal Indicator: Current season affecting resource availability
+## Current Status and Extensions
+1. Physical Food Resource System: Added a complete system of food resources that must be actively sought by prey
+2. Enhanced Predator-Prey Balance: Improved hunting and reproduction mechanics for stable population cycles
+3. Realistic Competition: Implemented direct resource competition between entities
+4. Carrying Capacity Mechanisms: Added natural population control through resource limitations
+5. Improved Visualization: Enhanced visual feedback for all ecosystem components
 
+## Future Work
+Future plans include:
+
+1. More Advanced Invasive Species: Modeling interactions with different types of invasive species
+2. Genetic Adaptation: Modeling evolutionary changes in populations
 
 Common Issues:
 ```
