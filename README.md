@@ -63,11 +63,17 @@ Data Flow
 The simulation follows a unidirectional data flow:
 
 User input → Visualization → Simulation
+
 Simulation updates World state
+
 World updates Entities and Resources
+
 Entities make decisions via Behavior/Reproduction Systems
+
 Entity states and interactions affect World state
+
 DataCollector gathers metrics from World
+
 Visualization renders current World state
 
 Entity Behaviors
