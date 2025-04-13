@@ -556,6 +556,9 @@ class Renderer:
             bool: True if rendering was successful
         """
         try:
+            # First render food resources (so they appear behind entities)
+            self._render_food_resources()
+            
             # Get all entities
             entities = self._simulation.world.entities
             
@@ -649,6 +652,79 @@ class Renderer:
             from src.utils.exceptions import logger
             logger.error(f"Error rendering entity: {e}")
             return False
+        
+    def _render_food_resources(self):
+        """
+        Render food resources in the world.
+    
+        Returns:
+            bool: True if rendering was successful
+        """
+        try:
+            # Get all food resources
+            food_resources = self._simulation.world._food_resources
+        
+            # Only render active food resources
+            active_resources = [food for food in food_resources if food.is_active]
+        
+            # Sort by size (larger drawn first to avoid overlap issues)
+            active_resources.sort(key=lambda food: food.size, reverse=True)
+        
+            # Define food color based on season
+            season = self._simulation.world.current_season
+            
+            if season == SeasonType.SPRING:
+                food_color = (20, 180, 20)  # Bright green for spring
+            elif season == SeasonType.SUMMER:
+                food_color = (20, 160, 20)  # Slightly darker green for summer
+            elif season == SeasonType.FALL:
+                food_color = (140, 180, 20)  # Yellow-green for fall
+            elif season == SeasonType.WINTER:
+                food_color = (120, 150, 80)  # Brownish-green for winter
+            else:
+                food_color = (20, 170, 20)  # Default green
+        
+           # Render each resource
+            for food in active_resources:
+                # Calculate visual size based on resource size and energy
+                base_size = 3 + (food.size * 2)
+            
+                # Adjust for depletion
+                visual_size = base_size * (1.0 - (food.depletion * 0.7))
+
+                # Apply entity size multiplier
+                scaled_size = visual_size * self._entity_size_multiplier
+            
+                # Adjust color based on depletion
+                depletion_factor = 1.0 - food.depletion
+                color = (
+                    int(food_color[0] * depletion_factor),
+                    int(food_color[1] * depletion_factor),
+                    int(food_color[2] * depletion_factor)
+                )
+            
+                # Draw food resource
+                pygame.draw.circle(
+                    self._screen,
+                    color,
+                    (int(food.position.x), int(food.position.y)),
+                    int(scaled_size)
+                )
+            
+                # Draw small white dot in center for visibility
+                pygame.draw.circle(
+                    self._screen,
+                    (255, 255, 255),
+                    (int(food.position.x), int(food.position.y)),
+                    max(1, int(scaled_size / 5))
+                )
+        
+            return True
+        except Exception as e:
+            from src.utils.exceptions import logger
+            logger.error(f"Error rendering food resources: {str(e)}")
+            return False
+
     
     def _render_selection(self, entity):
         """

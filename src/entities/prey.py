@@ -68,6 +68,12 @@ class Prey(Entity):
         Returns:
             bool: True if update was successful
         """
+        # Store reference to world for population checks
+        self._last_world = world
+    
+        # Ensure time_delta is positive
+        effective_time_delta = max(0.001, time_delta)
+
         # Update base entity state
         super().update(world, time_delta)
         
@@ -79,8 +85,98 @@ class Prey(Entity):
         
         # Update foraging cooldown
         if self._foraging_cooldown > 0:
-            self._foraging_cooldown = max(0, self._foraging_cooldown - time_delta)
+            self._foraging_cooldown = max(0, self._foraging_cooldown - effective_time_delta)
+    
+        # IMPORTANT: Implement starvation for population control
+        try:
+            stats = world.get_statistics()
+            if 'prey_count' in stats:
+                prey_count = stats['prey_count']
+            
+                # Define resource scarcity threshold
+                scarcity_threshold = 120  # Population where resources start becoming scarce
+            
+                if prey_count > scarcity_threshold:
+                    # Calculate resource scarcity factor
+                    scarcity_factor = ((prey_count - scarcity_threshold) / 100) * 0.2
+                    scarcity_factor = min(0.9, scarcity_factor)  # Cap at 90% resource reduction
+                
+                    # Apply energy depletion due to resource competition
+                    if random.random() < scarcity_factor:
+                        energy_loss = self.attributes.energy_consumption * 2.0 * random.uniform(0.5, 1.5)
+                        self.energy -= energy_loss
+
+                        from src.utils.exceptions import logger
+                        if random.random() < 0.01:  # Log occasionally to avoid spam
+                            logger.info(f"Prey experiencing resource scarcity. Population: {prey_count}, Energy loss: {energy_loss:.2f}")
+        except Exception as e:
+            from src.utils.exceptions import logger
+            logger.debug(f"Error applying resource scarcity: {e}")
+
+        # Check for nearby predators first (highest priority)
+        from src.entities.predator import Predator
+        predators_nearby = [
+            entity for entity in world.get_entities_in_range(
+                self.position, self.attributes.perception_range
+            )
+            if isinstance(entity, Predator) and entity.is_alive
+        ]
+    
+        if predators_nearby:
+            # Flee from the closest predator
+            closest_predator = min(
+                predators_nearby,
+                key=lambda p: self.position.distance_to(p.position)
+            )
+            self.flee(closest_predator)
+        else:
+            # No immediate danger, focus on other activities
         
+            # Forage if hungry or at medium energy (higher priority than before)
+            if (self.energy < 0.8 * self.attributes.max_energy and self._foraging_cooldown <= 0):
+                # More aggressive foraging behavior
+                foraging_success = self.forage(world)
+            
+                # If unsuccessful in finding food, move randomly to search
+                if not foraging_success and random.random() < 0.3:  # 30% chance to move
+                    self.move()
+        
+            # Try to reproduce if it's time and energy is high enough
+            elif self.can_reproduce() and self.energy > 0.7 * self.attributes.max_energy:
+                # Find potential mates
+                potential_mates = [
+                    entity for entity in world.get_entities_in_range(
+                       self.position, self.attributes.interaction_range
+                    )
+                    if isinstance(entity, type(self)) 
+                    and entity.is_alive 
+                    and entity.gender != self.gender
+                    and entity.can_reproduce()
+                ]
+            
+                if potential_mates:
+                    # Reproduce with a random mate
+                    offspring = self.reproduce(random.choice(potential_mates), world)
+                    
+                    # Log reproduction
+                    if offspring:
+                        from src.utils.exceptions import logger
+                        if random.random() < 0.1:  # 10% chance to log
+                            logger.info(f"Prey {self.id} reproduced, creating {len(offspring)} offspring")
+                else:
+                    # Move randomly looking for mates
+                    self.move()
+            else:
+                # Either move randomly or continue foraging with low energy
+                if self.energy < 0.5 * self.attributes.max_energy and self._foraging_cooldown <= 0:
+                    # Desperate foraging
+                    self.forage(world)
+                else:
+                    # Just move around
+                    self.move()
+    
+        return True
+
         # Use behavior system if available
         behavior_system = getattr(self, '_behavior_system', None)
         if behavior_system is not None:
@@ -189,31 +285,55 @@ class Prey(Entity):
     
     def forage(self, world):
         """
-        Forage for food in the environment.
-        
+        Forage for physical food resources in the environment.
+    
         Args:
             world: The world environment
-            
+        
         Returns:
             bool: True if foraging was successful
-            
-        Raises:
-            EntityError: If foraging fails
         """
         try:
             # Apply foraging cooldown
-            self._foraging_cooldown = 3.0  # 3 seconds cooldown
+            self._foraging_cooldown = 2.0  # 2 seconds cooldown
+        
+            # Search for nearby food resources
+            perception_range = getattr(self.attributes, 'perception_range', 80.0)
+            nearby_food = world.get_food_resources_in_range(self.position, perception_range)
+        
+            # If food found, move towards and consume it
+            if nearby_food:
+                target_food = nearby_food[0]  # Closest food resource
             
-            # Simple implementation - prey gains energy from the environment
-            energy_gained = self.attributes.foraging_efficiency * random.uniform(0.5, 1.0)
-            self.energy = min(self.attributes.max_energy, self.energy + energy_gained)
+                # If close enough to consume
+                if self.position.distance_to(target_food.position) < self.attributes.interaction_range:
+                    # Consume the food resource
+                    energy_gained = target_food.consume(self, 0.2)  # Consumption rate
+                
+                    # Apply the energy gain
+                    self.energy = min(self.attributes.max_energy, self.energy + energy_gained)
+                
+                    # Log occasional foraging success
+                    if random.random() < 0.01:  # 1% chance to log
+                        from src.utils.exceptions import logger
+                        logger.info(f"Prey {self.id} consumed food resource, gaining {energy_gained:.1f} energy")
+                
+                    return True
+                else:
+                    # Move towards the food
+                    self.move(target_food.position)
+                    return True
+            else:
+                # No food in range, move randomly to search
+                self.move()
+                return False
             
-            # Move while foraging
-            self.move()
-            
-            return True
         except Exception as e:
-            raise EntityError(f"Foraging failed: {str(e)}", entity=self)
+            from src.utils.exceptions import logger
+            logger.error(f"Error during foraging: {str(e)}")
+            # Ensure movement even if error
+            self.move()
+            return False
     
     def interact(self, other, world):
         """
