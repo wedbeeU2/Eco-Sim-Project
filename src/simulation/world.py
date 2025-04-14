@@ -1,7 +1,6 @@
 """
 World environment module for the ecosystem simulation.
 """
-import random
 from src.systems.spatial_grid import SpatialPartitioning
 from src.core.position import Position
 from src.utils.exceptions import (
@@ -34,16 +33,7 @@ class World:
             self._spatial_index = SpatialPartitioning(width, height)
             self._current_time = 0.0
             self._current_season = None  # Will be set by simulation
-
-            # NEW: Add food resources management
-            self._food_resources = []
-            self._food_spawn_timer = 0.0
-            self._target_food_density = 0.0002  # Target food per square unit
-            self._max_food_count = int(width * height * self._target_food_density)
-            self._min_food_count = int(self._max_food_count * 0.3)  # Minimum 30% of max
-        
-            # Initialize starting food
-            self._initialize_food_resources()
+            self._resources = {}  # Resource distribution in the world
         except Exception as e:
             raise WorldError(f"Failed to initialize world: {str(e)}")
     
@@ -180,14 +170,11 @@ class World:
             WorldError: If update fails
         """
         try:
-            # Ensure time_delta is positive
-            effective_time_delta = max(0.001, time_delta)
+            # Validate input parameters
+            validate_positive(time_delta, "time_delta")
             
             # Update world time
-            self._current_time += effective_time_delta
-
-            # NEW: Update food resources
-            self.manage_food_resources(effective_time_delta)
+            self._current_time += time_delta
             
             # Make a copy of the entities list to avoid issues if list changes during iteration
             entities_to_update = list(self._entities)
@@ -408,149 +395,34 @@ class World:
             return True
         except Exception as e:
             raise WorldError(f"Failed to add resource: {str(e)}")
-        
-    def _initialize_food_resources(self):
-        """
-        Initialize food resources in the world.
     
-        Returns:
-            bool: True if initialization was successful
+    def get_resources_in_range(self, resource_type, position, radius):
         """
-        try:
-            from src.core.food_resource import FoodResource
+        Get resources of a specific type in range of a position.
         
-            # Calculate initial food count - start with 50% of max
-            initial_food_count = int(self._max_food_count * 0.5)
-        
-            # Create food resources with random positions
-            for _ in range(initial_food_count):
-                self.spawn_food_resource()
-        
-            from src.utils.exceptions import logger
-            logger.info(f"Initialized {initial_food_count} food resources")
-        
-            return True
-        except Exception as e:
-            from src.utils.exceptions import logger
-            logger.error(f"Failed to initialize food resources: {str(e)}")
-            return False
-
-    def spawn_food_resource(self, position=None, energy_value=None, size=None):
-        """
-        Spawn a new food resource at a specific or random position.
-    
         Args:
-            position (Position, optional): Position for the new resource, random if None
-            energy_value (float, optional): Energy value for the resource, random if None
-            size (float, optional): Size of the resource, random if None
-        
+            resource_type (str): The type of resource
+            position (Position): Center position
+            radius (float): Search radius
+            
         Returns:
-            FoodResource: The newly spawned food resource
-        """
-        try:
-            from src.core.position import Position
-            from src.core.food_resource import FoodResource
-        
-            # Generate random position if not provided
-            if position is None:
-                position = Position(
-                    random.uniform(0, self._width),
-                    random.uniform(0, self._height)
-                )
-        
-            # Generate random energy value if not provided (15-45)
-            if energy_value is None:
-                energy_value = random.uniform(15.0, 45.0)
-        
-            # Generate random size if not provided (0.5-1.5)
-            if size is None:
-                size = random.uniform(0.5, 1.5)
-        
-            # Create and add the food resource
-            food = FoodResource(position, energy_value, size)
-            self._food_resources.append(food)
-        
-            return food
-        except Exception as e:
-            from src.utils.exceptions import logger
-            logger.error(f"Failed to spawn food resource: {str(e)}")
-            return None
-    
-    def get_food_resources_in_range(self, position, range_radius):
-        """
-        Get all food resources within a certain range of a position.
-    
-        Args:
-            position (Position): The center position
-            range_radius (float): The search radius
-        
-        Returns:
-            list: Food resources within the specified range, sorted by distance
+            list: Resources in range
+            
+        Raises:
+            WorldError: If resource search fails
         """
         try:
             validate_type(position, "position", Position)
-            validate_positive(range_radius, "range_radius")
-        
-            # Find food resources in range
-            resources_in_range = [
-                resource for resource in self._food_resources
-                if resource.is_active and position.distance_to(resource.position) <= range_radius
+            validate_positive(radius, "radius")
+            
+            # Check if resource type exists
+            if resource_type not in self._resources:
+                return []
+            
+            # Filter resources by distance
+            return [
+                resource for resource in self._resources[resource_type]
+                if position.distance_to(resource["position"]) <= radius
             ]
-        
-            # Sort by distance (closest first)
-            resources_in_range.sort(key=lambda r: position.distance_to(r.position))
-        
-            return resources_in_range
         except Exception as e:
-            from src.utils.exceptions import logger
-            logger.error(f"Failed to get food resources in range: {str(e)}")
-            return []
-
-    def manage_food_resources(self, time_delta):
-        """
-        Manage food resources in the world (update, spawn, remove).
-    
-        Args:
-            time_delta (float): Time elapsed since last update
-        
-        Returns:
-            bool: True if management was successful
-        """
-        try:
-            # Update each food resource
-            for food in list(self._food_resources):
-                food.update(self, time_delta)
-        
-            # Remove inactive (fully depleted) resources that haven't regrown
-            self._food_resources = [food for food in self._food_resources if food.is_active]
-        
-            # Update spawn timer
-            self._food_spawn_timer += time_delta
-        
-            # Check if it's time to spawn new food
-            if self._food_spawn_timer >= 5.0:  # Every 5 seconds
-                self._food_spawn_timer = 0.0
-            
-                # Count active food resources
-                active_food_count = len(self._food_resources)
-            
-                # Spawn food if below minimum count
-                if active_food_count < self._min_food_count:
-                    # Calculate how many to spawn - up to 10% of max at once
-                    spawn_count = min(
-                        int(self._max_food_count * 0.1),
-                        self._min_food_count - active_food_count
-                    )
-                
-                    # Spawn new food resources
-                    for _ in range(spawn_count):
-                        self.spawn_food_resource()
-                
-                    from src.utils.exceptions import logger
-                    logger.info(f"Spawned {spawn_count} new food resources. Total: {len(self._food_resources)}")
-        
-            return True
-        except Exception as e:
-            from src.utils.exceptions import logger
-            logger.error(f"Failed to manage food resources: {str(e)}")
-            return False
+            raise WorldError(f"Failed to get resources in range: {str(e)}")
