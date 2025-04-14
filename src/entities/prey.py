@@ -75,11 +75,11 @@ class Prey(Entity):
             return False
         
         # Update reproduction timer
-        self._time_since_last_reproduction += time_delta
+        self._time_since_last_reproduction += time_delta / 86400.0
         
         # Update foraging cooldown
         if self._foraging_cooldown > 0:
-            self._foraging_cooldown = max(0, self._foraging_cooldown - time_delta)
+            self._foraging_cooldown = max(0, self._foraging_cooldown - time_delta / 12400.0)
         
         # Use behavior system if available
         behavior_system = getattr(self, '_behavior_system', None)

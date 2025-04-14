@@ -133,8 +133,8 @@ class Entity(ABC):
             validate_positive(time_delta, "time_delta")
             
             # Base implementation for common behaviors
-            self._age += time_delta
-            self._energy -= self.attributes.energy_consumption * time_delta
+            self._age += time_delta / 86400.0
+            self._energy -= self.attributes.energy_consumption * time_delta / 10000.0
             
             # Check vital signs
             if self._energy <= 0 or self._health <= 0:

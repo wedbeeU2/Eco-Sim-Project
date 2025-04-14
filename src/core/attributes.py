@@ -84,11 +84,11 @@ class PredatorAttributes(EntityAttributes):
             maturity_age=450  # 2 years in days
         )
         
-        self._hunting_range = validate_positive(100.0, "hunting_range")
+        self._hunting_range = validate_positive(1000.0, "hunting_range")
         self._attack_strength = validate_positive(35.0, "attack_strength")
         self._breeding_cycle = validate_positive(130, "breeding_cycle")  # 6 months in days
         self._min_offspring = validate_positive(1, "min_offspring")
-        self._max_offspring = validate_positive(2, "max_offspring")
+        self._max_offspring = validate_positive(4, "max_offspring")
         self._digest_efficiency = validate_range(0.8, "digest_efficiency", 0, 1)  # 80% of prey energy is converted
     
     @property
@@ -192,7 +192,7 @@ class InvasiveSpeciesAttributes(EntityAttributes):
         self._adaptation_rate = validate_range(0.1, "adaptation_rate", 0, 1)  # How quickly it adapts
         self._breeding_cycle = validate_positive(25, "breeding_cycle")  # 25 days - faster breeding
         self._min_offspring = validate_positive(4, "min_offspring")
-        self._max_offspring = validate_positive(6, "max_offspring")  # More offspring
+        self._max_offspring = validate_positive(8, "max_offspring")  # More offspring
         self._resource_consumption = validate_positive(1.5, "resource_consumption")  # Consumes more resources
     
     @property

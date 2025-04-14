@@ -59,99 +59,100 @@ class Predator(Entity):
     
     def update(self, world, time_delta):
         """
-        Update the predator's state with balanced hunting and reproduction priorities.
-    
+        Update the predator's state with smarter hunting and reproduction priorities.
+
         Args:
             world (World): The world environment
             time_delta (float): Time elapsed since last update
         """
         # Ensure time_delta is positive
         effective_time_delta = max(0.001, time_delta)
-    
+
         # Update base entity state
         super().update(world, effective_time_delta)
-    
+
         if not self.is_alive:
             return False
-    
-        # Update reproduction timer
-        self._time_since_last_reproduction += effective_time_delta
-    
-        # Update hunting cooldown
+
+        # Update internal timers (in days)
+        self._time_since_last_reproduction += effective_time_delta / 86400.0
         if self._hunting_cooldown > 0:
-            self._hunting_cooldown = max(0, self._hunting_cooldown - effective_time_delta)
-    
-        # MAJOR CHANGE: Check reproduction readiness first
-        # This gives reproduction priority over hunting when possible
+            self._hunting_cooldown = max(0, self._hunting_cooldown - effective_time_delta / 24400.0)
+
+        # -----------------------------
+        # 🐾 PRIORITY 1: HUNT IF HUNGRY
+        # -----------------------------
+        if self.energy < 0.7 * self.attributes.max_energy:
+            from src.entities.prey import Prey
+
+            # Increase hunting range if starving
+            search_range = self.attributes.hunting_range
+            if self.energy < 0.4 * self.attributes.max_energy:
+                search_range *= 1.5
+
+            prey_in_range = [
+                entity for entity in world.get_entities_in_range(self.position, search_range)
+                if isinstance(entity, Prey) and entity.is_alive
+            ]
+
+            if prey_in_range:
+                # Target closest prey or weakest prey (optional logic here)
+                target_prey = min(
+                    prey_in_range,
+                    key=lambda p: self.position.distance_to(p.position)
+                )
+
+                if self.position.distance_to(target_prey.position) > self.attributes.interaction_range:
+                    # Not close enough yet — move toward prey
+                    self.move(target_prey.position)
+                    return True
+                elif self._hunting_cooldown <= 0:
+                    # Try to hunt
+                    if self.hunt(target_prey, world):
+                        from src.utils.exceptions import logger
+                        logger.info(f"Predator {self.id} hunted prey {target_prey.id}")
+                        return True
+
+            # No prey or not in range — wander to search
+            self.move()
+            return True
+
+        # ----------------------------------------
+        # 🧬 PRIORITY 2: REPRODUCE IF NOT HUNGRY
+        # ----------------------------------------
         if self.can_reproduce():
-            # Log reproduction attempt for debugging
             from src.utils.exceptions import logger
             logger.info(f"Predator {self.id} attempting to reproduce")
-        
-            # Find potential mates
+
             potential_mates = [
                 entity for entity in world.get_entities_in_range(
-                    self.position, self.attributes.interaction_range * 1.5  # Increased range
+                    self.position, self.attributes.interaction_range * 1.5
                 )
-                if isinstance(entity, type(self)) 
-                and entity.is_alive 
+                if isinstance(entity, type(self))
+                and entity.is_alive
                 and entity.gender != self.gender
                 and entity.can_reproduce()
             ]
-        
+
             if potential_mates:
-                # Reproduce with a random mate
                 mate = random.choice(potential_mates)
 
-                # Move towards mate if not already close
                 if self.position.distance_to(mate.position) > self.attributes.interaction_range:
                     self.move(mate.position)
                 else:
-                    # Attempt reproduction
                     offspring = self.reproduce(mate, world)
                     if offspring:
-                        from src.utils.exceptions import logger
-                        logger.info(f"Predator {self.id} successfully reproduced, creating {len(offspring)} offspring")
-            
+                        logger.info(f"Predator {self.id} reproduced, offspring: {len(offspring)}")
                 return True
             else:
-                # Look for mates - move to a random location to find mates
-                # This makes predators actively search for mates
                 self.move()
                 return True
-    
-        # If not reproducing, check if hungry
-        if self.energy < 0.7 * self.attributes.max_energy:
-            # Find prey to hunt
-            from src.entities.prey import Prey
-            prey_in_range = [
-                entity for entity in world.get_entities_in_range(
-                    self.position, self.attributes.hunting_range
-                )
-                if isinstance(entity, Prey) and entity.is_alive
-            ]
-        
-            if prey_in_range and self._hunting_cooldown <= 0:
-                # Hunt a random prey
-                target_prey = random.choice(prey_in_range)
-                self.move(target_prey.position)
-                hunt_result = self.hunt(target_prey, world)
-            
-                # Log successful hunts for debugging
-                if hunt_result:
-                    from src.utils.exceptions import logger
-                    logger.info(f"Predator {self.id} successfully hunted prey")
-            
-                return True
-            else:
-                # Move randomly looking for prey
-                self.move()
-                return True
-        else:
-            # Not hungry or reproducing - move randomly
-            # This adds more exploration to find mates
-            self.move()
-            return True
+
+        # -------------------------------
+        # 🧭 PRIORITY 3: EXPLORE OR REST
+        # -------------------------------
+        self.move()
+        return True
 
     
     def _basic_behavior(self, world):
@@ -237,7 +238,7 @@ class Predator(Entity):
             # Check if close enough to attack
             if self.position.distance_to(prey.position) < self.attributes.interaction_range:
                 # Apply hunting cooldown
-                self._hunting_cooldown = 5.0  # Reduced from 5.0
+                self._hunting_cooldown = 5.0 
             
                 # Calculate base attack success probability
                 # Enhanced formula that factors in predator's adaptation
@@ -386,7 +387,7 @@ class Predator(Entity):
                 new_predator = type(self)(
                     position=offspring_position,
                     gender=offspring_gender,
-                    energy=0.6 * self.attributes.max_energy,  # Increased from 0.5
+                    energy=0.5 * self.attributes.max_energy,  # Increased from 0.5
                     age=0,
                     health=100
                 )
